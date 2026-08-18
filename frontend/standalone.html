@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>広告クリエイティブ 疲弊チェック — 差し替え時期を数字で判断</title>
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone@7.25.6/babel.min.js"></script>
+<style>
+body{font-family:system-ui,sans-serif;background:#f5f6f8;margin:0;padding:24px;color:#1a1a2e}
+.wrap{max-width:920px;margin:0 auto} h1{font-size:23px;color:#c0392b;margin-bottom:4px}
+h2{font-size:17px;margin:2px 0 8px} h3{font-size:14px;margin:12px 0 4px} .sub{color:#8a8f9c;font-size:12px}
+.card{background:#fff;border-radius:12px;padding:18px;margin:14px 0;box-shadow:0 1px 4px rgba(0,0,0,.08)}
+.stepbadge{display:inline-block;background:#c0392b;color:#fff;border-radius:20px;padding:3px 12px;font-size:12px;font-weight:bold;margin-bottom:8px}
+.intro{background:#fdeeee;border-radius:12px;padding:16px;font-size:14px;line-height:1.9}
+.intro .q{font-weight:bold;color:#c0392b;font-size:15px;margin-top:12px}
+.intro .q:first-child{margin-top:0}
+.guide{background:#fffbeb;border:2px dashed #f0c86a;border-radius:12px;padding:14px 16px;font-size:14px;line-height:1.8;color:#7a5b00}
+.guide b{color:#5c4400}
+table{border-collapse:collapse;width:100%;font-size:13.5px} th,td{border:1px solid #dde;padding:8px 6px;text-align:center} th{background:#fdeeee;font-size:12.5px}
+td.l,th.l{text-align:left} tbody tr:nth-child(even){background:#fafbfd}
+td input,td select{border:1.5px solid #b9cbe4;border-radius:6px;padding:6px;font-size:14px}
+td input{width:78px;text-align:right} td input.nm{width:150px;text-align:left} td select{background:#fff}
+input.big,textarea{width:100%;border:1.5px solid #b9cbe4;border-radius:8px;padding:10px;font-size:14px;font-family:inherit}
+textarea{min-height:130px;line-height:1.7}
+.metrics{display:flex;gap:12px;flex-wrap:wrap} .metric{flex:1;min-width:145px;background:#fdeeee;border-radius:10px;padding:14px;text-align:center}
+.metric .val{font-size:25px;font-weight:bold;color:#c0392b} .metric .l{font-size:12px;color:#556;margin-top:4px;line-height:1.5}
+.verdict{border-radius:12px;padding:18px;margin:10px 0}
+.vgood{background:#e7f7ef;border:2px solid #17a673} .vmid{background:#fff8e6;border:2px solid #f0a500} .vbad{background:#fdeeee;border:2px solid #e0533b}
+.verdict .big{font-size:20px;font-weight:bold} .verdict .desc{font-size:14px;line-height:1.9;margin-top:8px}
+.todo{background:#fdeeee;border:1px solid #d6e4f7;border-radius:10px;padding:14px;margin-top:10px}
+.todo li{margin:9px 0;line-height:1.8;font-size:14px}
+.chk{display:flex;align-items:flex-start;gap:10px;padding:9px 0;border-bottom:1px solid #eef1f5;font-size:14px;line-height:1.7}
+.chk .mark{font-size:18px;flex-shrink:0;width:24px}
+button{border:0;border-radius:9px;cursor:pointer;font-size:14px;padding:10px 16px}
+button.go{background:#c0392b;color:#fff;font-size:15px} button.add{background:#c0392b;color:#fff;margin-top:10px}
+button.ghost{background:#eef2f8;color:#c0392b;margin-left:8px;font-size:13px;padding:9px 14px}
+button.del{background:#f7e4e4;color:#c0392b;padding:4px 10px;font-size:15px}
+.src{background:#f7f9fb;border:1px solid #e0e6ec;border-left:4px solid #8a8f9c;border-radius:8px;padding:12px;font-size:13px;color:#445;line-height:1.9;margin:10px 0}
+.src b{color:#1a1a2e} .src div{margin:4px 0}
+.note{color:#8a8f9c;font-size:12px;line-height:1.7}
+.bar{background:#eef1f5;border-radius:7px;height:28px;overflow:hidden;margin:5px 0}
+.bar>div{height:28px;border-radius:7px;display:flex;align-items:center;justify-content:flex-end;padding-right:9px;color:#fff;font-size:13px;font-weight:bold}
+.pill{padding:3px 10px;border-radius:12px;font-size:11.5px;font-weight:bold;white-space:nowrap}
+pre{background:#f7f9fb;border:1px solid #e0e6ec;border-radius:8px;padding:12px;overflow-x:auto;font-size:12.5px;line-height:1.6}
+@media(max-width:640px){body{padding:12px} .wrap{max-width:100%} h1{font-size:19px}
+ table{display:block;overflow-x:auto;white-space:nowrap;font-size:12.5px} .metrics{flex-direction:column}}
+</style>
+</head>
+<body>
+<div style="max-width:900px;margin:0 auto 4px;background:#fff8e1;border:1px solid #f0d98a;border-radius:10px;padding:10px 14px;font:13.5px system-ui;color:#7a5b00">🔬 <b>入力するだけで計算します</b>：日別の<b>表示回数とクリック数</b>を入れると、クリエイティブが飽きられているかを判定し、差し替え時期を出します。　AIサービスへの接続は不要で、計算はすべてこの画面の中で行われます。</div>
+<div id="root"></div>
+<script type="text/plain" id="__jsx">
+// ===== 自動保存 & データ書き出し/読み込み =====
+const STORE="fatigue_v1";
+function usePersist(name,initial){
+  const [v,setV]=React.useState(function(){
+    try{var s=localStorage.getItem(STORE+":"+name);return s?JSON.parse(s):initial;}catch(e){return initial;}
+  });
+  React.useEffect(function(){try{localStorage.setItem(STORE+":"+name,JSON.stringify(v));}catch(e){}},[name,v]);
+  return [v,setV];
+}
+function collectAll(){var o={};for(var i=0;i<localStorage.length;i++){var k=localStorage.key(i);
+  if(k&&k.indexOf(STORE+":")===0){try{o[k.slice(STORE.length+1)]=JSON.parse(localStorage.getItem(k));}catch(e){}}}return o;}
+function DataBar(){
+  const [msg,setMsg]=React.useState(""); const fileRef=React.useRef(null);
+  const save=function(){try{
+      var blob=new Blob([JSON.stringify({_tool:STORE,_savedAt:new Date().toISOString(),data:collectAll()},null,2)],{type:"application/json"});
+      var a=document.createElement("a");a.href=URL.createObjectURL(blob);
+      a.download=STORE+"_"+new Date().toISOString().slice(0,10)+".json";a.click();URL.revokeObjectURL(a.href);
+      setMsg("書き出しました");setTimeout(function(){setMsg("");},2500);}catch(e){setMsg("書き出しに失敗しました");}};
+  const load=function(e){var f=e.target.files&&e.target.files[0];if(!f)return;var rd=new FileReader();
+    rd.onload=function(){try{var j=JSON.parse(rd.result);if(!j||!j.data)throw new Error("形式が違います");
+      Object.keys(j.data).forEach(function(k){localStorage.setItem(STORE+":"+k,JSON.stringify(j.data[k]));});
+      location.reload();}catch(err){setMsg("読み込めませんでした");}};rd.readAsText(f);};
+  const clear=function(){if(!confirm("入力した内容をすべて消して最初の状態に戻します。よろしいですか？"))return;
+    var del=[];for(var i=0;i<localStorage.length;i++){var k=localStorage.key(i);if(k&&k.indexOf(STORE+":")===0)del.push(k);}
+    del.forEach(function(k){localStorage.removeItem(k);});location.reload();};
+  return (<div style={{background:"#f2f7f4",border:"1px solid #cfe3d8",borderRadius:10,padding:"9px 12px",
+      margin:"0 0 12px",fontSize:13,display:"flex",gap:8,alignItems:"center",flexWrap:"wrap",color:"#0f5c3f"}}>
+    <span>💾 <b>入力した内容はこの端末に自動保存されます</b>（閉じても消えません）</span>
+    <span style={{flex:1}}></span>
+    <button onClick={save} style={{border:0,borderRadius:7,background:"#17a673",color:"#fff",padding:"6px 11px",cursor:"pointer",fontSize:12.5}}>データを書き出す</button>
+    <button onClick={function(){fileRef.current&&fileRef.current.click();}} style={{border:0,borderRadius:7,background:"#e7f0eb",color:"#0f5c3f",padding:"6px 11px",cursor:"pointer",fontSize:12.5}}>読み込む</button>
+    <button onClick={clear} style={{border:0,borderRadius:7,background:"#f7e4e4",color:"#c0392b",padding:"6px 11px",cursor:"pointer",fontSize:12.5}}>最初に戻す</button>
+    <input ref={fileRef} type="file" accept="application/json" onChange={load} style={{display:"none"}}/>
+    {msg && <span style={{fontWeight:"bold"}}>{msg}</span>}
+  </div>);
+}
+function Intro(){
+  return (<div className="card"><div className="intro">
+    <div className="q">🎯 このツールで分かること</div><div>広告の「そろそろ変えたほうがいい？」を、感覚ではなく数字で判断できます。取り逃しているクリック数と金額も出ます。</div>
+    <div className="q">🙋 こんな人向け</div><div>・広告運用を担当している人（代理店・事業会社どちらも）<br/>・クリエイティブの<b>差し替え時期に迷う</b>人<br/>・上司やクライアントに<b>差し替えの根拠を説明</b>したい人</div>
+    <div className="q">📝 やること</div><div>広告管理画面から日別の表示回数とクリック数を写すだけ。4日分以上で判定できます。</div>
+  </div></div>);
+}
+
+const D0=[
+  {d:"1日目",imp:12000,clk:168},{d:"2日目",imp:12500,clk:170},{d:"3日目",imp:12200,clk:159},
+  {d:"4日目",imp:11800,clk:142},{d:"5日目",imp:12100,clk:133},{d:"6日目",imp:12400,clk:124},
+  {d:"7日目",imp:12000,clk:108},{d:"8日目",imp:11900,clk:95},
+];
+const ctrOf=r=>r.imp>0?r.clk/r.imp*100:0;
+const avg=a=>a.length?a.reduce((x,y)=>x+y,0)/a.length:0;
+
+function analyze(rows){
+  const c=rows.map(ctrOf);
+  if(c.length<4)return null;
+  const base=avg(c.slice(0,3));              // 初期3日を基準にする
+  const recent=avg(c.slice(-3));             // 直近3日
+  const drop=base>0?(base-recent)/base*100:0;
+  // ピークからの下落
+  const peak=Math.max(...c), peakIdx=c.indexOf(peak);
+  const last=c[c.length-1];
+  const fromPeak=peak>0?(peak-last)/peak*100:0;
+  // 連続で下がっている日数
+  let streak=0;
+  for(let i=c.length-1;i>0;i--){ if(c[i]<c[i-1])streak++; else break; }
+  // 単純な線形回帰の傾き（1日あたりCTR変化）
+  const n=c.length; const xs=c.map((_,i)=>i);
+  const mx=avg(xs), my=avg(c);
+  const slope=xs.reduce((a,x,i)=>a+(x-mx)*(c[i]-my),0)/(xs.reduce((a,x)=>a+Math.pow(x-mx,2),0)||1);
+  // 現在の傾きが続いた場合、基準の70%を割るまでの日数
+  const limit=base*0.7;
+  const daysToLimit=slope<0?Math.max(0,Math.ceil((last-limit)/-slope)):null;
+  const totalImp=rows.reduce((a,r)=>a+r.imp,0);
+  return {c,base,recent,drop,peak,peakIdx,last,fromPeak,streak,slope,daysToLimit,totalImp};
+}
+function verdict(a){
+  if(!a)return ["vmid","データが足りません","4日以上のデータを入れてください。"];
+  if(a.drop>=25||a.streak>=4)return ["vbad","🔴 疲弊しています。すぐ差し替えを",
+    "初期に比べてクリック率が"+a.drop.toFixed(0)+"%落ちています。同じ人に何度も表示され、飽きられている状態です。放置すると同じ予算で取れる件数が減り続けます。"];
+  if(a.drop>=12||a.streak>=3)return ["vmid","🟡 弱ってきています。次の準備を",
+    "クリック率が"+a.drop.toFixed(0)+"%低下し、下落が"+a.streak+"日続いています。今のうちに次のクリエイティブを用意してください。"];
+  if(a.slope<0)return ["vmid","🟡 ゆるやかに下がっています",
+    "急激ではありませんが下降傾向です。数字を見ながら様子を見てください。"];
+  return ["vgood","✅ まだ元気です","クリック率は維持されています。このまま配信を続けて問題ありません。"];
+}
+
+function App(){
+  const [rows,setRows]=usePersist("rows",D0);
+  const [cpc,setCpc]=usePersist("cpc",120);
+  const a=analyze(rows);
+  const v=verdict(a);
+  const upd=(i,k,val)=>setRows(rs=>rs.map((r,j)=>j===i?{...r,[k]:(k==="d")?val:(Number(val)||0)}:r));
+  const del=i=>setRows(rs=>rs.filter((_,j)=>j!==i));
+  const add=()=>setRows(rs=>[...rs,{d:(rs.length+1)+"日目",imp:12000,clk:100}]);
+  const maxC=a?Math.max(...a.c,0.01):1;
+  // 差し替えなかった場合の損失（直近CTRが基準まで戻ればいくら取れたか）
+  const lostClicks=a?Math.max(0,(a.base-a.recent)/100*rows.slice(-3).reduce((x,r)=>x+r.imp,0)):0;
+
+  return (<div className="wrap"><DataBar/>
+    <h1>広告クリエイティブ 疲弊チェック</h1>
+    <div className="sub" style={{marginBottom:10}}>「そろそろ差し替えたほうがいい？」を数字で判定します。</div>
+    <Intro/>
+
+    <div className="card">
+      <div className="stepbadge">STEP 1</div>
+      <h2>日ごとの数字を入れてください</h2>
+      <div className="guide">
+        👇 <b>ここを触ってください。</b>広告管理画面から、同じクリエイティブの<b>日別データ</b>を写すだけです。<br/>
+        ・<b>表示回数</b>…インプレッション（Imp）<br/>
+        ・<b>クリック数</b>…クリック（Click）<br/>
+        クリック率は自動で計算します。4日分以上あれば判定できます。
+      </div>
+      <table style={{marginTop:12}}><thead><tr><th className="l">日付</th><th>表示回数</th><th>クリック数</th><th>クリック率</th><th></th></tr></thead>
+        <tbody>{rows.map((r,i)=>(<tr key={i}>
+          <td className="l"><input className="nm" style={{width:110}} value={r.d} onChange={e=>upd(i,"d",e.target.value)}/></td>
+          <td><input value={r.imp} onChange={e=>upd(i,"imp",e.target.value)}/></td>
+          <td><input value={r.clk} onChange={e=>upd(i,"clk",e.target.value)}/></td>
+          <td><b>{ctrOf(r).toFixed(2)}%</b></td>
+          <td><button className="del" onClick={()=>del(i)}>×</button></td></tr>))}
+        </tbody></table>
+      <button className="add" onClick={add}>＋ 1日追加</button>
+      <button className="ghost" onClick={()=>setRows(D0)}>最初の例に戻す</button>
+      <div style={{marginTop:10,fontSize:14}}>クリック単価(CPC) <input type="number" value={cpc} onChange={e=>setCpc(Number(e.target.value)||0)}
+        style={{width:90,border:"1.5px solid #b9cbe4",borderRadius:6,padding:"6px",textAlign:"right",fontSize:14}}/> 円
+        <span className="sub">（損失額の計算に使います）</span></div>
+      <div className="src">
+        <b>❓ この数字はどこから取るの？</b>
+        <div>・広告管理画面（Google広告 / Meta広告 / Yahoo!広告など）の<b>「日別」レポート</b>から、対象クリエイティブの表示回数とクリック数をコピーしてください。</div>
+        <div>・<b>1つのクリエイティブ単位</b>で見てください。キャンペーン全体だと、他の要因が混ざって判定できません。</div>
+        <div>・最初に入っている8日分は<b>使い方を示すための例</b>です（架空の数字です）。</div>
+      </div>
+    </div>
+
+    <div className="card">
+      <div className="stepbadge">STEP 2</div>
+      <h2>判定結果</h2>
+      <div className={"verdict "+v[0]}>
+        <div className="big">{v[1]}</div>
+        <div className="desc">{v[2]}</div>
+      </div>
+      {a && <div className="metrics" style={{marginTop:12}}>
+        <div className="metric"><div className="val">{a.base.toFixed(2)}%</div><div className="l">最初の3日の<br/>平均クリック率</div></div>
+        <div className="metric"><div className="val">{a.recent.toFixed(2)}%</div><div className="l">直近3日の<br/>平均クリック率</div></div>
+        <div className="metric"><div className="val" style={{color:a.drop>0?"#c0392b":"#17a673"}}>{a.drop>0?"−"+a.drop.toFixed(0)+"%":"+"+Math.abs(a.drop).toFixed(0)+"%"}</div><div className="l">クリック率の変化</div></div>
+        <div className="metric"><div className="val">{a.streak}日</div><div className="l">連続で下がっている<br/>日数</div></div>
+      </div>}
+      {a && <div>
+        <h3>クリック率の推移</h3>
+        {rows.map((r,i)=>{const c=ctrOf(r);const isPeak=i===a.peakIdx;
+          return (<div key={i}>
+            <div style={{fontSize:12.5,color:"#445",marginTop:5}}>{r.d}　{c.toFixed(2)}%{isPeak?" ← 最も良かった日":""}</div>
+            <div className="bar"><div style={{width:Math.max(6,c/maxC*100)+"%",
+              background:isPeak?"#17a673":(i>=rows.length-3?"#e0533b":"#8aa9d6")}}>{c.toFixed(2)}%</div></div>
+          </div>);})}
+        <div className="sub">緑＝最も良かった日 ／ 赤＝直近3日</div>
+      </div>}
+    </div>
+
+    {a && <div className="card">
+      <div className="stepbadge">STEP 3</div>
+      <h2>いつ差し替えるか・いくら損しているか</h2>
+      <div className="metrics">
+        <div className="metric"><div className="val">{a.daysToLimit!==null?a.daysToLimit+"日後":"—"}</div>
+          <div className="l">このペースだと<br/>初期の70%を割る時期</div></div>
+        <div className="metric"><div className="val">{Math.round(lostClicks)}件</div><div className="l">直近3日で取り逃した<br/>と考えられるクリック</div></div>
+        <div className="metric"><div className="val">{Math.round(lostClicks*cpc/10000*10)/10}万円</div><div className="l">その金額換算<br/>（CPC{cpc}円で計算）</div></div>
+      </div>
+      <div className="todo">
+        <b>やること</b>
+        <ul>
+          {a.drop>=25 && <li><b>今すぐ差し替える</b>：{a.drop.toFixed(0)}%低下は、続けても回復しません。新しいクリエイティブに切り替えてください。</li>}
+          {a.drop>=12 && a.drop<25 && <li><b>次の候補を今日作る</b>：数日以内に差し替えが必要になります。今から準備すれば配信を止めずに済みます。</li>}
+          <li><b>変えるのは「言っていること」から</b>：色やフォントを変えても効果は戻りません。<b>訴求（誰の何の悩みに応えるか）</b>を変えてください。</li>
+          <li><b>配信対象を広げる</b>：同じ人に何度も出ていることが原因なので、ターゲットを広げると回復することがあります。</li>
+          <li><b>良かった日を記録しておく</b>：最も良かったのは「{rows[a.peakIdx]?rows[a.peakIdx].d:"—"}」（{a.peak.toFixed(2)}%）。この時の条件をメモしておくと次に活きます。</li>
+          <li><b>3〜4本を順番に回す</b>：1本を使い切るのではなく、複数を交代させると疲弊が遅くなります。</li>
+        </ul>
+      </div>
+    </div>}
+
+    <p className="note">※判定は入力された表示回数・クリック数だけを使った実計算です（最初の3日と直近3日の比較、連続下落日数、傾きの計算）。<br/>
+    ※クリック率の低下は「飽きられた」以外の理由（季節・競合の参入・入札変更・配信先の変化）でも起こります。<b>他の変更がなかったか</b>を必ず確認してください。<br/>
+    ※「初期の70%」「25%低下で要差し替え」などの基準は<b>当社が設定した目安</b>で、公的な基準ではありません。</p>
+  </div>);
+}
+
+</script>
+<script>(function(){var src=document.getElementById("__jsx").textContent;var out=Babel.transform(src,{presets:[["react",{runtime:"classic"}]]}).code;(0,eval)(out);ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));})();</script>
+</body></html>
