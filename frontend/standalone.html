@@ -315,7 +315,118 @@ function Footer(){
     <div className="printonly">印刷日: {new Date().toLocaleDateString("ja-JP")}</div>
   </div>);
 }
-function Root(){return (<React.Fragment><ActionBar/><App/><Footer/></React.Fragment>);}
+function Root(){return (<React.Fragment><ShareBar/><ActionBar/><App/><Footer/></React.Fragment>);}
+
+
+// ===== サーバー保管・複数人共有 =====
+const API="https://di-tools-api.vercel.app/api/workspace";
+function qs(k){try{return new URLSearchParams(location.search).get(k)||"";}catch(e){return "";}}
+function ShareBar(){
+  const [busy,setBusy]=React.useState(false);
+  const [msg,setMsg]=React.useState("");
+  const [info,setInfo]=React.useState(function(){
+    try{var s=localStorage.getItem(STORE+":__share");return s?JSON.parse(s):null;}catch(e){return null;}
+  });
+  const [who,setWho]=React.useState(function(){
+    try{return localStorage.getItem("di_who")||"";}catch(e){return "";}
+  });
+  const [loaded,setLoaded]=React.useState(null);
+  const [title,setTitle]=React.useState("");
+
+  // 共有リンクで開かれた場合はサーバーから読み込む
+  React.useEffect(function(){
+    var id=qs("ws"); if(!id)return;
+    var key=qs("key");
+    setBusy(true);
+    fetch(API+"?id="+encodeURIComponent(id))
+      .then(function(r){return r.json();})
+      .then(function(j){
+        if(j.error){setMsg("読み込めませんでした: "+j.error);setBusy(false);return;}
+        Object.keys(j.data||{}).forEach(function(k){
+          localStorage.setItem(STORE+":"+k,JSON.stringify(j.data[k]));
+        });
+        if(key)localStorage.setItem(STORE+":__share",JSON.stringify({id:id,editKey:key}));
+        setLoaded({title:j.title,updatedBy:j.updatedBy,updatedAt:j.updatedAt,canEdit:!!key});
+        // 取り込んだ内容を反映するため再読込（?ws= は外す）
+        if(!sessionStorage.getItem("di_loaded_"+id)){
+          sessionStorage.setItem("di_loaded_"+id,"1");
+          location.replace(location.pathname);
+        }
+        setBusy(false);
+      })
+      .catch(function(){setMsg("サーバーに接続できませんでした");setBusy(false);});
+  },[]);
+
+  const remember=function(v){setWho(v);try{localStorage.setItem("di_who",v);}catch(e){}};
+  const body=function(){
+    return {tool:STORE, title:title||document.title, who:who,
+      data:(typeof collectAll==="function"?collectAll():{})};
+  };
+  const create=function(){
+    setBusy(true);setMsg("");
+    fetch(API,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body())})
+      .then(function(r){return r.json();})
+      .then(function(j){
+        if(j.error){setMsg(j.error);setBusy(false);return;}
+        var nx={id:j.id,editKey:j.editKey};
+        localStorage.setItem(STORE+":__share",JSON.stringify(nx));
+        setInfo(nx);setMsg("サーバーに保存しました");setBusy(false);
+      }).catch(function(){setMsg("サーバーに接続できませんでした");setBusy(false);});
+  };
+  const update=function(){
+    if(!info)return create();
+    setBusy(true);setMsg("");
+    fetch(API+"?id="+info.id+"&key="+info.editKey,{method:"PUT",
+      headers:{"Content-Type":"application/json"},body:JSON.stringify(body())})
+      .then(function(r){return r.json();})
+      .then(function(j){
+        if(j.error){setMsg(j.error);setBusy(false);return;}
+        setMsg("サーバーに保存しました（"+new Date().toLocaleTimeString("ja-JP")+"）");setBusy(false);
+      }).catch(function(){setMsg("サーバーに接続できませんでした");setBusy(false);});
+  };
+  const linkView=info?(location.origin+location.pathname+"?ws="+info.id):"";
+  const linkEdit=info?(linkView+"&key="+info.editKey):"";
+  const copy=function(t,label){
+    if(navigator.clipboard&&navigator.clipboard.writeText){
+      navigator.clipboard.writeText(t).then(function(){setMsg(label+"をコピーしました");
+        setTimeout(function(){setMsg("");},3000);});
+    }else{
+      var ta=document.createElement("textarea");ta.value=t;document.body.appendChild(ta);ta.select();
+      try{document.execCommand("copy");setMsg(label+"をコピーしました");}catch(e){}
+      document.body.removeChild(ta);
+    }
+  };
+  const bs={border:0,borderRadius:7,padding:"7px 12px",cursor:"pointer",fontSize:12.5};
+  return (<div className="noprint" style={{background:"#eef4fb",border:"1px solid #c5d8f5",borderRadius:10,
+      padding:"10px 12px",margin:"0 0 12px",fontSize:13,color:"#1a4d8f"}}>
+    <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
+      <span>☁️ <b>サーバーに保存して、チームで共有できます</b></span>
+      <span style={{flex:1}}></span>
+      <input value={who} onChange={function(e){remember(e.target.value);}} placeholder="お名前（任意）"
+        style={{border:"1px solid #b9cbe4",borderRadius:6,padding:"6px 8px",fontSize:12.5,width:120}}/>
+      {!info && <button onClick={create} disabled={busy}
+        style={Object.assign({},bs,{background:"#2b6cb0",color:"#fff"})}>{busy?"保存中…":"サーバーに保存"}</button>}
+      {info && <button onClick={update} disabled={busy}
+        style={Object.assign({},bs,{background:"#2b6cb0",color:"#fff"})}>{busy?"保存中…":"変更を保存"}</button>}
+    </div>
+    {loaded && <div style={{marginTop:8,background:"#fff",borderRadius:8,padding:"8px 10px"}}>
+      📥 共有リンクから読み込みました{loaded.updatedBy?"（最終更新: "+loaded.updatedBy+"）":""}。
+      {loaded.canEdit?"このリンクは編集できます。":"このリンクは閲覧専用です（変更しても他の人には反映されません）。"}
+    </div>}
+    {info && <div style={{marginTop:8,background:"#fff",borderRadius:8,padding:"8px 10px",lineHeight:2}}>
+      <div><b>閲覧用リンク</b>（見るだけ）
+        <button onClick={function(){copy(linkView,"閲覧用リンク");}} style={Object.assign({},bs,{background:"#e2e8f0",color:"#334155",marginLeft:6})}>コピー</button>
+        <div style={{fontSize:11.5,color:"#667",wordBreak:"break-all"}}>{linkView}</div></div>
+      <div style={{marginTop:6}}><b>編集用リンク</b>（変更もできる／取扱注意）
+        <button onClick={function(){copy(linkEdit,"編集用リンク");}} style={Object.assign({},bs,{background:"#e2e8f0",color:"#334155",marginLeft:6})}>コピー</button>
+        <div style={{fontSize:11.5,color:"#667",wordBreak:"break-all"}}>{linkEdit}</div></div>
+    </div>}
+    {msg && <div style={{marginTop:6,fontWeight:"bold"}}>{msg}</div>}
+    <div style={{marginTop:6,fontSize:11.5,color:"#5b7fb0"}}>
+      ※「サーバーに保存」を押したときだけ送信されます。押さなければ、これまで通り端末内だけで処理されます。
+    </div>
+  </div>);
+}
 
 </script>
 <script>(function(){var src=document.getElementById("__jsx").textContent;var out=Babel.transform(src,{presets:[["react",{runtime:"classic"}]]}).code;(0,eval)(out);ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(Root));})();</script>
