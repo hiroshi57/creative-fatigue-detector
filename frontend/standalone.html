@@ -3,6 +3,12 @@
 <head>
 <meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>広告クリエイティブ 疲弊チェック — 差し替え時期を数字で判断</title>
+<meta property="og:title" content="広告クリエイティブ 疲弊チェック — 差し替え時期を数字で判断" />
+<meta property="og:type" content="website" />
+<meta property="og:description" content="入力するだけで計算します。インストール不要・登録不要・データは端末内で処理します。" />
+<meta name="description" content="広告クリエイティブ 疲弊チェック — 差し替え時期を数字で判断｜入力するだけで計算。インストール不要・登録不要。" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%232b6cb0'/%3E%3Ctext x='16' y='22' font-size='17' text-anchor='middle' fill='white' font-family='sans-serif'%3E%E2%9C%93%3C/text%3E%3C/svg%3E" />
+
 <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script src="https://unpkg.com/@babel/standalone@7.25.6/babel.min.js"></script>
@@ -45,6 +51,23 @@ button.del{background:#f7e4e4;color:#c0392b;padding:4px 10px;font-size:15px}
 pre{background:#f7f9fb;border:1px solid #e0e6ec;border-radius:8px;padding:12px;overflow-x:auto;font-size:12.5px;line-height:1.6}
 @media(max-width:640px){body{padding:12px} .wrap{max-width:100%} h1{font-size:19px}
  table{display:block;overflow-x:auto;white-space:nowrap;font-size:12.5px} .metrics{flex-direction:column}}
+
+/* ===== 印刷・PDF保存用（提案書や報告書に添付できるようにする） ===== */
+@media print{
+  body{background:#fff!important;padding:0!important;color:#000}
+  .wrap{max-width:100%!important}
+  .card{box-shadow:none!important;border:1px solid #ccc!important;break-inside:avoid;page-break-inside:avoid;margin:8px 0!important}
+  button,.noprint,input[type=file],.guide{display:none!important}
+  input,select,textarea{border:none!important;background:transparent!important;padding:0!important;
+    -webkit-appearance:none;appearance:none;font-weight:bold;color:#000!important}
+  textarea{height:auto!important;min-height:0!important;overflow:visible!important}
+  table{font-size:11px!important} th,td{padding:4px!important}
+  h1{font-size:18px!important} h2{font-size:14px!important}
+  .printonly{display:block!important}
+  a{text-decoration:none;color:#000}
+}
+.printonly{display:none}
+
 </style>
 </head>
 <body>
@@ -237,6 +260,63 @@ function App(){
   </div>);
 }
 
+
+function ActionBar(){
+  const [msg,setMsg]=React.useState("");
+  // 画面の内容をテキストとして取り出し、Excel等に貼れる形でコピーする
+  const copyAll=function(){
+    try{
+      var root=document.getElementById("root");
+      var out=[];
+      root.querySelectorAll("h1,h2,h3,table,.metric,.verdict,.todo li,.chk").forEach(function(el){
+        if(el.tagName==="TABLE"){
+          el.querySelectorAll("tr").forEach(function(tr){
+            var cells=[];
+            tr.querySelectorAll("th,td").forEach(function(td){
+              var inp=td.querySelector("input,select");
+              cells.push(((inp?inp.value:td.textContent)||"").trim().replace(/\s+/g," "));
+            });
+            if(cells.join("").trim())out.push(cells.join("\t"));
+          });
+          out.push("");
+        }else{
+          var t=(el.textContent||"").trim().replace(/\s+/g," ");
+          if(t)out.push(t);
+        }
+      });
+      var text=out.join("\n");
+      if(navigator.clipboard&&navigator.clipboard.writeText){
+        navigator.clipboard.writeText(text).then(function(){setMsg("コピーしました（Excelやメールに貼れます）");},function(){fallback(text);});
+      }else fallback(text);
+      function fallback(t){
+        var ta=document.createElement("textarea");ta.value=t;document.body.appendChild(ta);ta.select();
+        try{document.execCommand("copy");setMsg("コピーしました");}catch(e){setMsg("コピーできませんでした");}
+        document.body.removeChild(ta);
+      }
+      setTimeout(function(){setMsg("");},3000);
+    }catch(e){setMsg("コピーできませんでした");}
+  };
+  return (<div className="noprint" style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap",margin:"0 0 12px"}}>
+    <button onClick={function(){window.print();}}
+      style={{border:0,borderRadius:8,background:"#334155",color:"#fff",padding:"8px 14px",cursor:"pointer",fontSize:13}}>
+      🖨 印刷 / PDFで保存</button>
+    <button onClick={copyAll}
+      style={{border:0,borderRadius:8,background:"#e2e8f0",color:"#334155",padding:"8px 14px",cursor:"pointer",fontSize:13}}>
+      📋 結果をコピー（Excelに貼れます）</button>
+    {msg && <span style={{fontSize:12.5,color:"#0f5c3f",fontWeight:"bold"}}>{msg}</span>}
+  </div>);
+}
+function Footer(){
+  return (<div className="wrap" style={{margin:"24px auto 8px",fontSize:11.5,color:"#8a8f9c",lineHeight:1.9,
+      borderTop:"1px solid #e0e6ec",paddingTop:12}}>
+    <div><b style={{color:"#556"}}>提供</b>：株式会社デジタルアイデンティティ</div>
+    <div><b style={{color:"#556"}}>データの取り扱い</b>：入力された内容は<b>お使いの端末の中だけ</b>に保存されます。当社のサーバーへ送信・保存されることはありません。端末を共有している場合は、画面上の「最初に戻す」で消去してください。</div>
+    <div><b style={{color:"#556"}}>ご利用にあたって</b>：本ツールの計算結果は<b>判断の材料</b>であり、成果を保証するものではありません。最終的な意思決定はご自身の責任で行ってください。本ツールの利用により生じた損害について、当社は責任を負いかねます。</div>
+    <div className="printonly">印刷日: {new Date().toLocaleDateString("ja-JP")}</div>
+  </div>);
+}
+function Root(){return (<React.Fragment><ActionBar/><App/><Footer/></React.Fragment>);}
+
 </script>
-<script>(function(){var src=document.getElementById("__jsx").textContent;var out=Babel.transform(src,{presets:[["react",{runtime:"classic"}]]}).code;(0,eval)(out);ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));})();</script>
+<script>(function(){var src=document.getElementById("__jsx").textContent;var out=Babel.transform(src,{presets:[["react",{runtime:"classic"}]]}).code;(0,eval)(out);ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(Root));})();</script>
 </body></html>
