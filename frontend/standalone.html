@@ -632,6 +632,7 @@ function verdict(a) {
 function App() {
   const [rows, setRows] = usePersist("rows", D0);
   const [cpc, setCpc] = usePersist("cpc", 120);
+  const [pro, setPro] = React.useState(zenIsPro());
   const a = analyze(rows);
   const v = verdict(a);
   const upd = (i, k, val) => setRows(rs => rs.map((r, j) => j === i ? {
@@ -639,11 +640,15 @@ function App() {
     [k]: k === "d" ? val : Number(val) || 0
   } : r));
   const del = i => setRows(rs => rs.filter((_, j) => j !== i));
-  const add = () => setRows(rs => [...rs, {
-    d: rs.length + 1 + "日目",
-    imp: 12000,
-    clk: 100
-  }]);
+  const add = () => {
+    if (!pro && !zenCanUse()) { zenShowPaywall(); return; }
+    if (!pro) { zenRecordUse(); setPro(zenIsPro()); }
+    setRows(rs => [...rs, {
+      d: rs.length + 1 + "日目",
+      imp: 12000,
+      clk: 100
+    }]);
+  };
   const maxC = a ? Math.max(...a.c, 0.01) : 1;
   // 差し替えなかった場合の損失（直近CTRが基準まで戻ればいくら取れたか）
   const lostClicks = a ? Math.max(0, (a.base - a.recent) / 100 * rows.slice(-3).reduce((x, r) => x + r.imp, 0)) : 0;
@@ -1495,5 +1500,105 @@ function ShareBar() {
     }
   }, "\u203B\u300C\u30B5\u30FC\u30D0\u30FC\u306B\u4FDD\u5B58\u300D\u3092\u62BC\u3057\u305F\u3068\u304D\u3060\u3051\u9001\u4FE1\u3055\u308C\u307E\u3059\u3002\u62BC\u3055\u306A\u3051\u308C\u3070\u3001\u3053\u308C\u307E\u3067\u901A\u308A\u7AEF\u672B\u5185\u3060\u3051\u3067\u51E6\u7406\u3055\u308C\u307E\u3059\u3002"));
 }
+
+// 法人向けライセンス販売（LicenseBar/licValid等）を前提とした実装のみで、
+// Zenアプリ標準の個人向け買い切りペイウォールが存在しなかった。カタログ
+// （zenapps.json）側にはPro価格・Stripe決済URLが既に設定されているのに
+// アプリ側に課金導線が無い状態だったため、certzen/geoauditzen等と同じ設計の
+// ペイウォールを追加する。既存のdi-toolsライセンス機構（LicenseBar等）とは
+// 独立して動作し、干渉しない。
+(function () {
+  var ZEN_STORE_KEY = 'zen-paywall-v1';
+  var ZEN_SLUG = 'fatiguezen';
+  var ZEN_FREE_LIMIT = 3;
+  var ZEN_APP_TITLE = 'FatigueZen';
+  var ZEN_PRICE = '¥980';
+  var ZEN_PRO_FEATURES = ['直近14日間の推移グラフ表示', '複数クリエイティブの一括比較', '疲弊アラートのCSV書き出し'];
+  var ZEN_TEASER = '【判定】クリック率の下落幅・連続下落日数・疲弊予測日を算出中…';
+  var ZEN_PAYMENT_LINK = 'https://buy.stripe.com/7sY8wQbaugHzgh59c02ZO16';
+
+  function zenLoadAll() {
+    try { return JSON.parse(localStorage.getItem(ZEN_STORE_KEY) || '{}'); }
+    catch (e) { return {}; }
+  }
+  function zenState() {
+    var all = zenLoadAll();
+    return all[ZEN_SLUG] || { used: 0, pro: false, purchasedAt: null };
+  }
+  function zenSetState(s) {
+    var all = zenLoadAll();
+    all[ZEN_SLUG] = s;
+    try { localStorage.setItem(ZEN_STORE_KEY, JSON.stringify(all)); } catch (e) {}
+  }
+  function zenCheckPurchaseReturn() {
+    var params = new URLSearchParams(window.location.search);
+    if (params.get('zen_pro') === '1' && params.get('slug') === ZEN_SLUG) {
+      zenUnlockPro();
+      params.delete('zen_pro'); params.delete('slug');
+      var clean = window.location.pathname + (params.toString() ? '?' + params : '');
+      window.history.replaceState({}, '', clean);
+    }
+  }
+  window.zenIsPro = function () { return zenState().pro === true; };
+  window.zenCanUse = function () { return window.zenIsPro() || zenState().used < ZEN_FREE_LIMIT; };
+  window.zenRemaining = function () {
+    return window.zenIsPro() ? Infinity : Math.max(0, ZEN_FREE_LIMIT - zenState().used);
+  };
+  window.zenRecordUse = function () {
+    if (window.zenIsPro()) return;
+    var s = zenState();
+    s.used += 1;
+    zenSetState(s);
+  };
+  function zenUnlockPro() {
+    var s = zenState();
+    s.pro = true;
+    s.purchasedAt = new Date().toISOString();
+    zenSetState(s);
+  }
+  function zenStartCheckout() {
+    var ret = encodeURIComponent(window.location.origin + window.location.pathname + '?zen_pro=1&slug=' + ZEN_SLUG);
+    var url = ZEN_PAYMENT_LINK + (ZEN_PAYMENT_LINK.indexOf('?') >= 0 ? '&' : '?') + 'client_reference_id=' + ZEN_SLUG + '&redirect=' + ret;
+    window.location.href = url;
+  }
+  window.zenShowPaywall = function () {
+    var existing = document.getElementById('zen-paywall-modal');
+    if (existing) existing.remove();
+
+    var previousBodyOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    var blockScroll = function (e) { e.preventDefault(); };
+    document.addEventListener('wheel', blockScroll, { passive: false });
+    document.addEventListener('touchmove', blockScroll, { passive: false });
+    var restoreScroll = function () {
+      document.body.style.overflow = previousBodyOverflow;
+      document.removeEventListener('wheel', blockScroll);
+      document.removeEventListener('touchmove', blockScroll);
+    };
+    window.scrollTo(0, 0);
+
+    var overlay = document.createElement('div');
+    overlay.id = 'zen-paywall-modal';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:99999;font-family:sans-serif';
+    var feats = ZEN_PRO_FEATURES.map(function (f) { return '<li>' + f + '</li>'; }).join('');
+    overlay.innerHTML =
+      '<div style="background:#fff;border-radius:16px;padding:28px 24px;max-width:340px;width:90%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.3)">'
+      + '<div style="font-size:2rem;margin-bottom:8px">💎</div>'
+      + '<h2 style="margin:0 0 6px;font-size:1.2rem;color:#111">' + ZEN_APP_TITLE + ' Pro</h2>'
+      + '<p style="margin:0 0 14px;font-size:.85rem;color:#666">無料分を使い切りました。Proで全機能が使えます。</p>'
+      + '<div style="text-align:left;font-size:.78rem;color:#555;background:#f5f3ff;border-radius:8px;padding:8px 10px;margin:0 0 12px">' + ZEN_TEASER + '</div>'
+      + '<ul style="text-align:left;font-size:.82rem;color:#444;margin:0 0 16px;padding-left:18px">' + feats + '</ul>'
+      + '<button id="zen-paywall-buy" style="width:100%;padding:12px;border:none;border-radius:10px;background:linear-gradient(135deg,#7c3aed,#4f46e5);color:#fff;font-weight:700;font-size:.95rem;cursor:pointer">' + ZEN_PRICE + ' でProを購入（買い切り）</button>'
+      + '<button id="zen-paywall-close" style="width:100%;padding:10px;margin-top:8px;border:none;background:none;color:#999;font-size:.82rem;cursor:pointer">あとで</button>'
+      + '</div>';
+    document.body.appendChild(overlay);
+    overlay.querySelector('#zen-paywall-buy').onclick = function () { zenStartCheckout(); };
+    overlay.querySelector('#zen-paywall-close').onclick = function () { restoreScroll(); overlay.remove(); };
+    overlay.onclick = function (e) { if (e.target === overlay) { restoreScroll(); overlay.remove(); } };
+  };
+
+  zenCheckPurchaseReturn();
+})();
+
 ReactDOM.createRoot(document.getElementById("root")).render((typeof Root!=="undefined"?React.createElement(Root):React.createElement(App)));
 </script></html>

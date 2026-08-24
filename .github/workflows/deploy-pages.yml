@@ -1,0 +1,44 @@
+name: Deploy to GitHub Pages
+
+# frontend/standalone.html（ビルド不要の単一HTML）をindex.htmlとして
+# GitHub Pagesにデプロイする。Vercelの自動ビルドがRoot Directory設定と
+# ファイル配置の不整合で不安定だったため（2026-08-24、axauditzenで
+# standalone.htmlベースの本番デプロイが長期間更新されていなかったことが
+# 判明）、より単純で確実な配信経路として導入。
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "frontend/standalone.html"
+      - ".github/workflows/deploy-pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare site directory
+        run: |
+          mkdir -p site
+          cp frontend/standalone.html site/index.html
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+      - id: deployment
+        uses: actions/deploy-pages@v4
+
