@@ -1593,9 +1593,24 @@ function ShareBar() {
       + '<button id="zen-paywall-close" style="width:100%;padding:10px;margin-top:8px;border:none;background:none;color:#999;font-size:.82rem;cursor:pointer">あとで</button>'
       + '</div>';
     document.body.appendChild(overlay);
-    overlay.querySelector('#zen-paywall-buy').onclick = function () { zenStartCheckout(); };
-    overlay.querySelector('#zen-paywall-close').onclick = function () { restoreScroll(); overlay.remove(); };
-    overlay.onclick = function (e) { if (e.target === overlay) { restoreScroll(); overlay.remove(); } };
+    var buyBtn = overlay.querySelector('#zen-paywall-buy');
+    var closeBtn = overlay.querySelector('#zen-paywall-close');
+    var closeModal = function () { restoreScroll(); document.removeEventListener('keydown', onKeydown); overlay.remove(); };
+    var onKeydown = function (e) {
+      if (e.key === 'Escape') { closeModal(); return; }
+      if (e.key === 'Tab') {
+        // 2026-08-25（CVR-035、キーボード操作対応）: モーダル内の2ボタン間で
+        // フォーカスを循環させ、背後のページ要素にTabで抜けられないようにする。
+        e.preventDefault();
+        var active = document.activeElement;
+        (active === buyBtn ? closeBtn : buyBtn).focus();
+      }
+    };
+    document.addEventListener('keydown', onKeydown);
+    buyBtn.focus();
+    buyBtn.onclick = function () { zenStartCheckout(); };
+    closeBtn.onclick = closeModal;
+    overlay.onclick = function (e) { if (e.target === overlay) closeModal(); };
   };
 
   zenCheckPurchaseReturn();
