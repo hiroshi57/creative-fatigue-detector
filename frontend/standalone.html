@@ -642,7 +642,7 @@ function App() {
   const del = i => setRows(rs => rs.filter((_, j) => j !== i));
   const add = () => {
     if (!pro && !zenCanUse()) { zenShowPaywall(); return; }
-    if (!pro) { zenRecordUse(); setPro(zenIsPro()); }
+    if (!pro) { zenRecordUse(); setPro(zenIsPro()); window.zenMaybeWarnFreeLimit(); }
     setRows(rs => [...rs, {
       d: rs.length + 1 + "日目",
       imp: 12000,
@@ -1549,6 +1549,24 @@ function ShareBar() {
     var s = zenState();
     s.used += 1;
     zenSetState(s);
+  };
+  /** 無料枠の残り1回になった直後（＝次回でペイウォールに当たる）に、
+   * 唐突なブロックによる離脱を抑えるため画面下部に予告トーストを出す（CVR-041）。
+   * JSX側の構造に依存しないよう、DOM操作で独立に描画する。 */
+  window.zenMaybeWarnFreeLimit = function () {
+    if (window.zenIsPro() || window.zenRemaining() !== 1) return;
+    var existing = document.getElementById('zen-warn-toast');
+    if (existing) existing.remove();
+    var toast = document.createElement('div');
+    toast.id = 'zen-warn-toast';
+    toast.style.cssText =
+      'position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:99998;' +
+      'background:#fff4e0;border:1px solid #f0d98a;color:#8a6100;font-size:.8rem;' +
+      'padding:8px 16px;border-radius:999px;box-shadow:0 4px 16px rgba(0,0,0,.15);' +
+      'font-family:sans-serif;white-space:nowrap';
+    toast.textContent = '⏳ 次で無料枠終了です';
+    document.body.appendChild(toast);
+    setTimeout(function () { if (toast.parentNode) toast.remove(); }, 5000);
   };
   function zenUnlockPro() {
     var s = zenState();
