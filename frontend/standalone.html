@@ -642,7 +642,7 @@ function App() {
   const del = i => setRows(rs => rs.filter((_, j) => j !== i));
   const add = () => {
     if (!pro && !zenCanUse()) { zenShowPaywall(); return; }
-    if (!pro) { zenRecordUse(); setPro(zenIsPro()); window.zenMaybeWarnFreeLimit(); }
+    if (!pro) { zenRecordUse(); setPro(zenIsPro()); window.zenMaybeWarnFreeLimit(); window.zenMaybeShowUpsellHint(); }
     setRows(rs => [...rs, {
       d: rs.length + 1 + "日目",
       imp: 12000,
@@ -1512,10 +1512,20 @@ function ShareBar() {
   var ZEN_SLUG = 'fatiguezen';
   var ZEN_FREE_LIMIT = 3;
   var ZEN_APP_TITLE = 'FatigueZen';
+  // CVR-020: モーダル内の絵文字を各アプリのカタログemojiに合わせ、
+  // 通常画面との視覚的連続性を持たせる（zenapps.jsonのemojiと一致させる）。
+  var ZEN_EMOJI = '📉';
   var ZEN_PRICE = '¥980';
   var ZEN_PRO_FEATURES = ['直近14日間の推移グラフ表示 → 疲弊の兆候を早期に発見できる', '複数クリエイティブの一括比較 → 差し替え優先度を判断できる', '疲弊アラートのCSV書き出し → 運用チームへの共有が楽になる'];
   var ZEN_TEASER = '【判定】クリック率の下落幅・連続下落日数・疲弊予測日を算出中…';
   var ZEN_PAYMENT_LINK = 'https://buy.stripe.com/7sY8wQbaugHzgh59c02ZO16';
+  // CVR-011: モーダルタイトル直下に表示する社会的証明。実数の裏付けが無い
+  // 具体的人数（「12,000人」等）は事実と異なるため使わず、シリーズ展開の
+  // 事実（Zenシリーズとして複数アプリを展開していること）のみを訴求する。
+  var ZEN_SOCIAL_PROOF = 'Zenシリーズの1本としてご利用いただけます';
+  // CVR-013: Stripe Payment LinkはApple Pay/Google Pay等のExpress Checkoutを
+  // ダッシュボード側設定で有効化できる（Stripeダッシュボード → この決済リンクの
+  // 編集 → 支払い方法 → Apple Pay/Google Payを有効化）。コード変更は不要。
 
   function zenLoadAll() {
     try { return JSON.parse(localStorage.getItem(ZEN_STORE_KEY) || '{}'); }
@@ -1534,11 +1544,29 @@ function ShareBar() {
     var params = new URLSearchParams(window.location.search);
     if (params.get('zen_pro') === '1' && params.get('slug') === ZEN_SLUG) {
       zenUnlockPro();
+      // CVR-009: 購入完了をdataLayerへ送り、送客クリックに対する実購入完了率を
+      // 計測可能にする（送客クリック→購入0件のボトルネック特定に必須）。
+      window.dataLayer = window.dataLayer || [];
+      window.dataLayer.push({ event: 'purchase_completed', slug: ZEN_SLUG });
       params.delete('zen_pro'); params.delete('slug');
       var clean = window.location.pathname + (params.toString() ? '?' + params : '');
       window.history.replaceState({}, '', clean);
+      // CVR-028: 購入完了の実感を与えるため、完了トースト通知を表示する。
+      window.zenShowPurchaseThanks();
     }
   }
+  window.zenShowPurchaseThanks = function () {
+    var toast = document.createElement('div');
+    toast.id = 'zen-purchase-thanks-toast';
+    toast.style.cssText =
+      'position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:99998;' +
+      'background:#ecfdf5;border:1px solid #6ee7b7;color:#065f46;font-size:.85rem;' +
+      'padding:10px 18px;border-radius:999px;box-shadow:0 4px 16px rgba(0,0,0,.15);' +
+      'font-family:sans-serif;white-space:nowrap';
+    toast.textContent = '🎉 ご購入ありがとうございます。Proが有効になりました';
+    document.body.appendChild(toast);
+    setTimeout(function () { if (toast.parentNode) toast.remove(); }, 6000);
+  };
   window.zenIsPro = function () { return zenState().pro === true; };
   window.zenCanUse = function () { return window.zenIsPro() || zenState().used < ZEN_FREE_LIMIT; };
   window.zenRemaining = function () {
@@ -1568,6 +1596,23 @@ function ShareBar() {
     document.body.appendChild(toast);
     setTimeout(function () { if (toast.parentNode) toast.remove(); }, 5000);
   };
+  /** 初回無料利用の直後（1回目使用時点）に軽量な「Proだとこう変わります」
+   * ミニバナーを表示する（CVR-022）。3回使い切る前から段階的にPro訴求を行う。 */
+  window.zenMaybeShowUpsellHint = function () {
+    if (window.zenIsPro() || zenState().used !== 1) return;
+    var existing = document.getElementById('zen-upsell-hint');
+    if (existing) existing.remove();
+    var hint = document.createElement('div');
+    hint.id = 'zen-upsell-hint';
+    hint.style.cssText =
+      'position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:99998;' +
+      'background:#f5f3ff;border:1px solid #ddd6fe;color:#5b21b6;font-size:.8rem;' +
+      'padding:8px 16px;border-radius:999px;box-shadow:0 4px 16px rgba(0,0,0,.15);' +
+      'font-family:sans-serif;white-space:nowrap';
+    hint.textContent = '💎 Proだと' + (ZEN_PRO_FEATURES[0] || '').split(' →')[0] + 'も使えます';
+    document.body.appendChild(hint);
+    setTimeout(function () { if (hint.parentNode) hint.remove(); }, 5000);
+  };
   function zenUnlockPro() {
     var s = zenState();
     s.pro = true;
@@ -1575,8 +1620,17 @@ function ShareBar() {
     zenSetState(s);
   }
   function zenStartCheckout() {
+    // CVR-008: モーダル表示数に対する購入ボタンクリック率を計測可能にする。
+    window.dataLayer = window.dataLayer || [];
+    window.dataLayer.push({ event: 'checkout_started', slug: ZEN_SLUG });
     var ret = encodeURIComponent(window.location.origin + window.location.pathname + '?zen_pro=1&slug=' + ZEN_SLUG);
-    var url = ZEN_PAYMENT_LINK + (ZEN_PAYMENT_LINK.indexOf('?') >= 0 ? '&' : '?') + 'client_reference_id=' + ZEN_SLUG + '&redirect=' + ret;
+    // CVR-025: client_reference_idにアプリタイトルと時間帯（時単位）を付与し、
+    // どのアプリ・どの時間帯の送客が実際の購入に至ったかをStripe側の
+    // メタデータで追跡可能にする（Stripe側の識別文字列制約に配慮しURLセーフな
+    // 記号のみで構成）。
+    var checkoutHour = new Date().toISOString().slice(0, 13).replace(/[-T]/g, '');
+    var referenceId = ZEN_SLUG + '_' + ZEN_APP_TITLE.replace(/[^a-zA-Z0-9]/g, '') + '_' + checkoutHour;
+    var url = ZEN_PAYMENT_LINK + (ZEN_PAYMENT_LINK.indexOf('?') >= 0 ? '&' : '?') + 'client_reference_id=' + encodeURIComponent(referenceId) + '&redirect=' + ret;
     window.location.href = url;
   }
   window.zenShowPaywall = function () {
@@ -1597,24 +1651,60 @@ function ShareBar() {
 
     var overlay = document.createElement('div');
     overlay.id = 'zen-paywall-modal';
-    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:99999;font-family:sans-serif';
-    var feats = ZEN_PRO_FEATURES.map(function (f) { return '<li>' + f + '</li>'; }).join('');
+    // CVR-018: 背景オーバーレイの不透明度を上げ、視認性を強化する。
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.75);display:flex;align-items:center;justify-content:center;z-index:99999;font-family:sans-serif';
+    if (!document.getElementById('zen-modal-anim-style')) {
+      var animStyle = document.createElement('style');
+      animStyle.id = 'zen-modal-anim-style';
+      animStyle.textContent = '@keyframes zenModalIn{from{opacity:0;transform:scale(.94)}to{opacity:1;transform:scale(1)}}';
+      document.head.appendChild(animStyle);
+    }
+    // CVR-007: ペイウォール表示イベントをdataLayer（GA4想定）へ送り、
+    // 表示回数・購入率の算出を可能にする（計測基盤整備）。
+    window.dataLayer = window.dataLayer || [];
+    window.dataLayer.push({ event: 'paywall_shown', slug: ZEN_SLUG });
+    var feats = ZEN_PRO_FEATURES.map(function (f) { return '<li>✅ ' + f + '</li>'; }).join('');
     overlay.innerHTML =
-      '<div style="background:#fff;border-radius:16px;padding:28px 24px;max-width:340px;width:90%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.3)">'
-      + '<div style="font-size:2rem;margin-bottom:8px">💎</div>'
+      // CVR-026: スマートフォン実機でのタップ領域・文字間隔の窮屈さを緩和。
+      // CVR-018: フェードイン・スケールインのアニメーションで登場演出を強化。
+      '<div style="background:#fff;border-radius:16px;padding:32px 28px;max-width:380px;width:90%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.3);animation:zenModalIn 0.2s ease-out">'
+      + '<div style="font-size:2rem;margin-bottom:8px">' + ZEN_EMOJI + '</div>'
       + '<h2 style="margin:0 0 6px;font-size:1.2rem;color:#111">' + ZEN_APP_TITLE + ' Pro</h2>'
+      // CVR-021: 無料枠で既に得た利用実績を可視化し、「ここまで使った価値」を
+      // 実感させる。診断結果の中身（件数等）はアプリごとに構造が異なり汎用的に
+      // 取得できないため、共通で取得できる実施回数（zenState().used）を使う。
+      + '<p style="margin:0 0 6px;font-size:.72rem;color:#7c3aed">これまでに' + zenState().used + '回ご利用いただきました</p>'
+      // CVR-011: 社会的証明表示（北西大学調査でCVR最大270%向上の知見）。
+      + '<p style="margin:0 0 10px;font-size:.72rem;font-weight:700;color:#4f46e5">' + ZEN_SOCIAL_PROOF + '</p>'
       + '<p style="margin:0 0 14px;font-size:.85rem;color:#666">たくさんご利用いただきありがとうございます。ここからはProで。</p>'
+      // CVR-001: 価格を機能リストより前に早期表示し、価格の透明性を高める。
+      + '<div style="font-size:.95rem;font-weight:700;color:#111;background:#f5f3ff;border-radius:8px;padding:8px;margin:0 0 12px">' + ZEN_PRICE + '（買い切り・追加課金なし）</div>'
       + '<p style="margin:0 0 4px;font-size:.72rem;font-weight:700;color:#7c3aed">Proだとこんな分析結果が見られます:</p>'
       + '<div style="text-align:left;font-size:.78rem;color:#555;background:#f5f3ff;border-radius:8px;padding:8px 10px;margin:0 0 12px">' + ZEN_TEASER + '</div>'
-      + '<ul style="text-align:left;font-size:.82rem;color:#444;margin:0 0 16px;padding-left:18px">' + feats + '</ul>'
-      + '<div style="font-size:.72rem;color:#888;margin:0 0 8px">コンビニのコーヒー1杯程度で、この先ずっと使えます</div>'
-      + '<button id="zen-paywall-buy" aria-label="' + ZEN_APP_TITLE + ' Proを' + ZEN_PRICE + 'で購入する" style="width:100%;padding:12px;border:none;border-radius:10px;background:linear-gradient(135deg,#7c3aed,#4f46e5);color:#fff;font-weight:700;font-size:.95rem;cursor:pointer">' + ZEN_PRICE + ' でProを購入（買い切り）</button>'
-      + '<button id="zen-paywall-close" style="width:100%;padding:10px;margin-top:8px;border:none;background:none;color:#999;font-size:.82rem;cursor:pointer">あとで</button>'
+      // CVR-010: 機能リストの各項目先頭にチェックマークを付与（視覚的差別化）。
+      + '<ul style="text-align:left;font-size:.82rem;color:#444;margin:0 0 16px;padding-left:18px;list-style:none">' + feats + '</ul>'
+      + '<div style="font-size:.72rem;color:#888;margin:0 0 4px">コンビニのコーヒー1杯程度で、この先ずっと使えます</div>'
+      // CVR-015: 課金形態（買い切り・サブスクではない）の誤解防止注記。
+      + '<div style="font-size:.7rem;color:#888;margin:0 0 8px">一度のお支払いで永久利用可能・サブスクではありません</div>'
+      + '<button id="zen-paywall-buy" aria-label="' + ZEN_APP_TITLE + ' Proを' + ZEN_PRICE + 'で購入する" style="width:100%;padding:14px;border:none;border-radius:10px;background:linear-gradient(135deg,#7c3aed,#4f46e5);color:#fff;font-weight:700;font-size:.95rem;cursor:pointer;transition:transform .15s,box-shadow .15s" onmouseover="this.style.transform=\'scale(1.03)\';this.style.boxShadow=\'0 6px 20px rgba(124,58,237,.4)\'" onmouseout="this.style.transform=\'scale(1)\';this.style.boxShadow=\'none\'">今すぐ' + ZEN_PRICE + 'で解放する（買い切り・登録不要）</button>'
+      // CVR-003/024: 決済先（Stripe公式ドメイン）への信頼性シグナルを
+      // 購入ボタン直下に明示し、フィッシング懸念による離脱を防ぐ。
+      + '<div style="font-size:.68rem;color:#999;margin-top:6px">🔒 決済はStripe公式ドメイン（buy.stripe.com）が安全に処理します</div>'
+      + '<button id="zen-paywall-close" style="width:100%;padding:10px;margin-top:8px;border:none;background:none;color:#999;font-size:.82rem;cursor:pointer">無料版のまま続ける</button>'
       + '</div>';
     document.body.appendChild(overlay);
     var buyBtn = overlay.querySelector('#zen-paywall-buy');
     var closeBtn = overlay.querySelector('#zen-paywall-close');
-    var closeModal = function () { restoreScroll(); document.removeEventListener('keydown', onKeydown); overlay.remove(); };
+    var closeModal = function () {
+      // CVR-006: 「あとで」離脱理由をlocalStorageへタイムスタンプ付きで記録し、
+      // 離脱率計測の土台とする。
+      try {
+        var log = JSON.parse(localStorage.getItem('zen-paywall-dismiss-log') || '[]');
+        log.push({ slug: ZEN_SLUG, at: new Date().toISOString() });
+        localStorage.setItem('zen-paywall-dismiss-log', JSON.stringify(log));
+      } catch (e) {}
+      restoreScroll(); document.removeEventListener('keydown', onKeydown); overlay.remove();
+    };
     var onKeydown = function (e) {
       if (e.key === 'Escape') { closeModal(); return; }
       if (e.key === 'Tab') {
@@ -1627,8 +1717,17 @@ function ShareBar() {
     };
     document.addEventListener('keydown', onKeydown);
     buyBtn.focus();
-    buyBtn.onclick = function () { zenStartCheckout(); };
+    // CVR-014: クリック後の反応がないことによる二重クリック・離脱を防ぐため、
+    // Stripe遷移までの間ボタン表示を「読み込み中…」に切り替える。
+    buyBtn.onclick = function () {
+      buyBtn.disabled = true;
+      buyBtn.textContent = '読み込み中…';
+      zenStartCheckout();
+    };
     closeBtn.onclick = closeModal;
+    // CVR-012: モーダル本体クリックでの伝播停止を明示し、誤操作による
+    // 意図しない離脱を防ぐ（overlay.onclickのtarget===overlay判定と合わせ二重化）。
+    overlay.firstElementChild.onclick = function (e) { e.stopPropagation(); };
     overlay.onclick = function (e) { if (e.target === overlay) closeModal(); };
   };
 
