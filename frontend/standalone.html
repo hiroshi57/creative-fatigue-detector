@@ -642,7 +642,7 @@ function App() {
   const del = i => setRows(rs => rs.filter((_, j) => j !== i));
   const add = () => {
     if (!pro && !zenCanUse()) { zenShowPaywall(); return; }
-    if (!pro) { zenRecordUse(); setPro(zenIsPro()); window.zenMaybeWarnFreeLimit(); window.zenMaybeShowUpsellHint(); }
+    if (!pro) { zenRecordUse(); setPro(zenIsPro()); window.zenMaybeWarnFreeLimit(); window.zenMaybeShowUpsellHint(); window.zenUpdateRemainingBadge(); }
     setRows(rs => [...rs, {
       d: rs.length + 1 + "日目",
       imp: 12000,
@@ -1578,6 +1578,26 @@ function ShareBar() {
     s.used += 1;
     zenSetState(s);
   };
+  /** 無料枠の残り回数を常時表示する固定バッジ（CVR-016）。JSX側の構造が
+   * アプリごとに異なりレンダー部分への個別挿入が困難なため、DOM操作で
+   * 独立に描画する（他のトースト系関数と同じ設計方針）。Proになったら
+   * 自動的に非表示にする。 */
+  window.zenUpdateRemainingBadge = function () {
+    var existing = document.getElementById('zen-remaining-badge');
+    if (window.zenIsPro()) { if (existing) existing.remove(); return; }
+    var remaining = window.zenRemaining();
+    if (!existing) {
+      existing = document.createElement('div');
+      existing.id = 'zen-remaining-badge';
+      existing.style.cssText =
+        'position:fixed;top:12px;right:12px;z-index:99997;' +
+        'background:#f5f3ff;border:1px solid #ddd6fe;color:#5b21b6;font-size:.75rem;' +
+        'padding:6px 12px;border-radius:999px;box-shadow:0 2px 8px rgba(0,0,0,.1);' +
+        'font-family:sans-serif;white-space:nowrap;pointer-events:none';
+      document.body.appendChild(existing);
+    }
+    existing.textContent = '🆓 無料利用、残り' + remaining + '回';
+  };
   /** 無料枠の残り1回になった直後（＝次回でペイウォールに当たる）に、
    * 唐突なブロックによる離脱を抑えるため画面下部に予告トーストを出す（CVR-041）。
    * JSX側の構造に依存しないよう、DOM操作で独立に描画する。 */
@@ -1618,6 +1638,7 @@ function ShareBar() {
     s.pro = true;
     s.purchasedAt = new Date().toISOString();
     zenSetState(s);
+    window.zenUpdateRemainingBadge();
   }
   function zenStartCheckout() {
     // CVR-008: モーダル表示数に対する購入ボタンクリック率を計測可能にする。
@@ -1732,6 +1753,12 @@ function ShareBar() {
   };
 
   zenCheckPurchaseReturn();
+  // CVR-016: ページロード時に無料枠残り回数バッジを初期描画する。
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', window.zenUpdateRemainingBadge);
+  } else {
+    window.zenUpdateRemainingBadge();
+  }
 })();
 
 ReactDOM.createRoot(document.getElementById("root")).render((typeof Root!=="undefined"?React.createElement(Root):React.createElement(App)));
