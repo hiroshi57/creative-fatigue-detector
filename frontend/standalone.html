@@ -1706,11 +1706,19 @@ function ShareBar() {
       + '<ul style="text-align:left;font-size:.82rem;color:#444;margin:0 0 16px;padding-left:18px;list-style:none">' + feats + '</ul>'
       + '<div style="font-size:.72rem;color:#888;margin:0 0 4px">コンビニのコーヒー1杯程度で、この先ずっと使えます</div>'
       // CVR-015: 課金形態（買い切り・サブスクではない）の誤解防止注記。
-      + '<div style="font-size:.7rem;color:#888;margin:0 0 8px">一度のお支払いで永久利用可能・サブスクではありません</div>'
+      + '<div style="font-size:.7rem;color:#888;margin:0 0 4px">一度のお支払いで永久利用可能・サブスクではありません</div>'
+      // 2026-09-03（購入0件打開タスクC#16/CVR-089）: 初回購入への心理的
+      // ハードコード（実績ゼロで不安）を下げるため、返金保証を明記する。
+      // 自動返金の仕組みは無く、実際にリクエストが来た場合はStripe
+      // ダッシュボードから手動で返金処理する運用（ユーザー承認済み）。
+      + '<div style="font-size:.7rem;color:#059669;font-weight:600;margin:0 0 8px">✅ 7日間全額返金保証・お気軽にお試しください</div>'
       + '<button id="zen-paywall-buy" aria-label="' + ZEN_APP_TITLE + ' Proを' + ZEN_PRICE + 'で購入する" style="width:100%;padding:14px;border:none;border-radius:10px;background:linear-gradient(135deg,#7c3aed,#4f46e5);color:#fff;font-weight:700;font-size:.95rem;cursor:pointer;transition:transform .15s,box-shadow .15s" onmouseover="this.style.transform=\'scale(1.03)\';this.style.boxShadow=\'0 6px 20px rgba(124,58,237,.4)\'" onmouseout="this.style.transform=\'scale(1)\';this.style.boxShadow=\'none\'">今すぐ' + ZEN_PRICE + 'で解放する（買い切り・登録不要）</button>'
       // CVR-003/024: 決済先（Stripe公式ドメイン）への信頼性シグナルを
       // 購入ボタン直下に明示し、フィッシング懸念による離脱を防ぐ。
       + '<div style="font-size:.68rem;color:#999;margin-top:6px">🔒 決済はStripe公式ドメイン（buy.stripe.com）が安全に処理します</div>'
+      // 2026-09-03（購入0件打開タスクC#17/CVR-088）: 実績ゼロによる不安を
+      // 補うため、開発者の透明性訴求（個人開発である旨と連絡先）を追加。
+      + '<div style="font-size:.66rem;color:#aaa;margin-top:4px">開発者本人が運用しています。不具合・要望はXのDMまでご連絡ください</div>'
       + '<button id="zen-paywall-close" style="width:100%;padding:10px;margin-top:8px;border:none;background:none;color:#999;font-size:.82rem;cursor:pointer">無料版のまま続ける</button>'
       + '</div>';
     document.body.appendChild(overlay);
