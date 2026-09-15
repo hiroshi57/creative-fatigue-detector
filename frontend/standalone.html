@@ -654,7 +654,9 @@ function App() {
   const lostClicks = a ? Math.max(0, (a.base - a.recent) / 100 * rows.slice(-3).reduce((x, r) => x + r.imp, 0)) : 0;
   return /*#__PURE__*/React.createElement("div", {
     className: "wrap"
-  }, /*#__PURE__*/React.createElement(DataBar, null), /*#__PURE__*/React.createElement("h1", null, "\u5E83\u544A\u30AF\u30EA\u30A8\u30A4\u30C6\u30A3\u30D6 \u75B2\u5F0A\u30C1\u30A7\u30C3\u30AF"), /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement(DataBar, null), /*#__PURE__*/React.createElement("h1", null, "\u5E83\u544A\u30AF\u30EA\u30A8\u30A4\u30C6\u30A3\u30D6 \u75B2\u5F0A\u30C1\u30A7\u30C3\u30AF"), !pro && /*#__PURE__*/React.createElement("p", {
+    style: { fontSize: 12.5, color: "#6b7280", margin: "0 0 12px" }
+  }, "\uD83C\uDD93 \u767B\u9332\u4E0D\u8981\u30FB", window.zenFreeLimit ? window.zenFreeLimit() : 3, "\u56DE\u307E\u3067\u7121\u6599\u3067\u304A\u8A66\u3057\u3044\u305F\u3060\u3051\u307E\u3059"), /*#__PURE__*/React.createElement("div", {
     className: "sub",
     style: {
       marginBottom: 10
@@ -1568,6 +1570,9 @@ function ShareBar() {
     setTimeout(function () { if (toast.parentNode) toast.remove(); }, 6000);
   };
   window.zenIsPro = function () { return zenState().pro === true; };
+  // CVR-151: 利用開始前（App()のヘッダー直下）に無料枠の回数を事前案内するため、
+  // IIFEローカルのZEN_FREE_LIMITをApp()側から参照できるようにグローバル公開する。
+  window.zenFreeLimit = function () { return ZEN_FREE_LIMIT; };
   window.zenCanUse = function () { return window.zenIsPro() || zenState().used < ZEN_FREE_LIMIT; };
   window.zenRemaining = function () {
     return window.zenIsPro() ? Infinity : Math.max(0, ZEN_FREE_LIMIT - zenState().used);
